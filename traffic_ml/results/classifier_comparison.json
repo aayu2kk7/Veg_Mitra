@@ -1,0 +1,98 @@
+[
+  {
+    "Model": "Decision Tree (Single Baseline)",
+    "Accuracy": 1.0,
+    "Precision": 1.0,
+    "Recall": 1.0,
+    "F1_Score": 1.0,
+    "Confusion_Matrix": [
+      [
+        70,
+        0,
+        0
+      ],
+      [
+        0,
+        23,
+        0
+      ],
+      [
+        0,
+        0,
+        27
+      ]
+    ]
+  },
+  {
+    "Model": "Random Forest (Bagging)",
+    "Accuracy": 1.0,
+    "Precision": 1.0,
+    "Recall": 1.0,
+    "F1_Score": 1.0,
+    "Confusion_Matrix": [
+      [
+        70,
+        0,
+        0
+      ],
+      [
+        0,
+        23,
+        0
+      ],
+      [
+        0,
+        0,
+        27
+      ]
+    ]
+  },
+  {
+    "Model": "AdaBoost (Boosting)",
+    "Accuracy": 1.0,
+    "Precision": 1.0,
+    "Recall": 1.0,
+    "F1_Score": 1.0,
+    "Confusion_Matrix": [
+      [
+        70,
+        0,
+        0
+      ],
+      [
+        0,
+        23,
+        0
+      ],
+      [
+        0,
+        0,
+        27
+      ]
+    ]
+  },
+  {
+    "Model": "Gradient Boosting (Boosting)",
+    "Accuracy": 0.9917,
+    "Precision": 0.992,
+    "Recall": 0.9917,
+    "F1_Score": 0.9917,
+    "Confusion_Matrix": [
+      [
+        70,
+        0,
+        0
+      ],
+      [
+        0,
+        23,
+        0
+      ],
+      [
+        0,
+        1,
+        26
+      ]
+    ]
+  }
+]

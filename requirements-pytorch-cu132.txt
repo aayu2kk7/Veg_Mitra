@@ -1,0 +1,6 @@
+--index-url https://download.pytorch.org/whl/cu132
+--extra-index-url https://pypi.org/simple
+
+# CUDA 13.2 build verified with the project's NVIDIA RTX 5050 / Python 3.13 setup.
+torch==2.15.0+cu132
+torchvision==0.29.2+cu132

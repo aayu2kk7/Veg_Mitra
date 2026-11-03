@@ -1,0 +1,14 @@
+# dataset.yaml for VegMitra Traffic Vehicle Detection
+# Place the prepared dataset in the repository's data/ folder, or change this
+# value to the path of another BDD100K-derived YOLO dataset.
+path: data
+train: train/images
+val: val/images
+test: test/images
+
+# Classes
+names:
+  0: car
+  1: motorcycle
+  2: bus
+  3: truck

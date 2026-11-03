@@ -1,0 +1,35 @@
+# Training Configuration for VegMitra Traffic Detection
+model:
+  pretrained_weights: "yolov8n.pt"  # Start from the public COCO-pretrained YOLOv8n checkpoint
+  target_classes: ["car", "motorcycle", "bus", "truck"]
+  nc: 4
+
+training:
+  epochs: 50
+  batch_size: 4
+  imgsz: 640
+  learning_rate0: 0.001      # Lower learning rate for fine-tuning the existing detector
+  lrf: 0.01                  # Final learning rate fraction
+  momentum: 0.937
+  weight_decay: 0.0005
+  patience: 12               # Stop after this many epochs without validation improvement
+  optimizer: "AdamW"
+  seed: 42
+  workers: 8                 # Keep the GPU supplied from local dataset storage
+
+augmentation:
+  hsv_h: 0.015               # HSV hue adjustment fraction
+  hsv_s: 0.7                 # HSV saturation adjustment fraction
+  hsv_v: 0.4                 # HSV value adjustment fraction
+  degrees: 0.0               # Rotation degrees (traffic cars don't rotate upside down)
+  translate: 0.1             # Translation fraction
+  scale: 0.5                 # Image scale gain
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0                # Vertical flip disabled (cars are not inverted)
+  fliplr: 0.5                # Horizontal flip enabled
+  mosaic: 1.0                # Mosaic augmentation enabled
+
+inference:
+  confidence_threshold: 0.35
+  iou_threshold: 0.45

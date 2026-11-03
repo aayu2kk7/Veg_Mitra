@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VegMitra - AI 4-Direction Traffic Vision &amp; Adaptive Signal Controller</title>
+  
+  <!-- Tailwind CSS & Three.js CDN -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="styles/dashboard.css">
+
+  <style>
+    /* Neon Glows & Transitions */
+    .glow-green { box-shadow: 0 0 24px #10b981, inset 0 0 8px #10b981; }
+    .glow-red { box-shadow: 0 0 16px #ef4444, inset 0 0 6px #ef4444; }
+    .glow-amber { box-shadow: 0 0 20px #f59e0b, inset 0 0 8px #f59e0b; }
+    .card-active-green { 
+      border-color: #10b981 !important; 
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.35), inset 0 0 15px rgba(16, 185, 129, 0.15) !important;
+      background: linear-gradient(180deg, rgba(16, 185, 129, 0.1) 0%, rgba(13, 21, 39, 0.95) 100%) !important;
+    }
+    .card-active-amber {
+      border-color: #f59e0b !important;
+      box-shadow: 0 0 30px rgba(245, 158, 11, 0.35) !important;
+    }
+    .preview-box { aspect-ratio: 16 / 9; }
+    #canvas3d-container { width: 100%; height: 320px; overflow: hidden; border-radius: 14px; }
+    
+    /* Upload Hover State */
+    .upload-overlay {
+      transition: all 0.25s ease;
+      background: rgba(8, 13, 26, 0.75);
+      backdrop-filter: blur(4px);
+    }
+    .upload-box:hover .upload-overlay {
+      opacity: 1 !important;
+    }
+  </style>
+</head>
+<body class="bg-[#060913] text-[#f8fafc] antialiased p-3 sm:p-5 font-sans select-none min-h-screen">
+
+  <div class="max-w-7xl mx-auto space-y-4">
+    
+    <!-- Top Header Bar -->
+    <header class="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#0b1120] border border-[#1e2a44] shadow-2xl">
+      <div class="flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-[#111c30] border border-[#253553] flex items-center justify-center shadow-lg shrink-0">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="3" fill="#111c30" stroke="#253553" />
+            <circle cx="12" cy="7" r="2.2" fill="#ef4444" />
+            <circle cx="12" cy="12" r="2.2" fill="#f59e0b" />
+            <circle cx="12" cy="17" r="2.2" fill="#10b981" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+            Veg<span class="text-[#00e676]">Mitra</span>
+            <span class="text-xs font-bold text-[#38bdf8] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-sky-950/80 border border-sky-500/40">
+              4-Direction AI Vision Controller
+            </span>
+          </h1>
+          <p class="text-xs text-[#94a3b8]">Autonomous Multi-Camera Traffic Optimization &bull; High-Density Auto Toggling &bull; Inflow Arrival Modeling</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <div class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-950/80 border border-emerald-500/50 text-emerald-400">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#00e676] animate-pulse"></span>
+          <span>CONTINUOUS AUTO-TOGGLING</span>
+        </div>
+        <div class="px-3 py-1 rounded-lg bg-[#111c30] border border-[#1e2a44] text-xs font-mono text-[#94a3b8]">
+          MODEL: <span class="text-[#00e676] font-bold">YOLOv8n (Epoch 60 Checkpoint)</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Control Actions & Photo Upload Toolbar -->
+    <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#0d1424] border border-[#1e2a44] shadow-lg">
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- Mode Switch: Real Photo AI Vision vs Flow Simulation -->
+        <button id="btnAutoToggle" class="px-4 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/60 font-extrabold text-xs text-emerald-300 shadow-lg shadow-emerald-950 transition flex items-center gap-2 cursor-pointer">
+          <span id="autoIndicator" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+          <span id="btnAutoText">Mode: Real AI Vision (Photo Upload Priority)</span>
+        </button>
+
+        <!-- Analyze 4 Photos with YOLO -->
+        <button id="btnRunInference" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-blue-950">
+          <span id="inferIcon">⚡</span>
+          <span id="inferText">Run YOLOv8 on Current Photos</span>
+        </button>
+
+        <!-- Multi-Photo Upload Trigger -->
+        <label class="px-3.5 py-2 rounded-xl bg-[#1e293b] hover:bg-[#334155] font-bold text-xs text-white transition cursor-pointer flex items-center gap-1.5 border border-slate-700">
+          <span>📁 Select 4 Direction Photos</span>
+          <input type="file" id="multiFileInput" class="hidden" accept="image/*" multiple>
+        </label>
+
+        <!-- Test Samples Fallback -->
+        <button id="btnLoadTestSamples" class="px-3.5 py-2 rounded-xl bg-[#131d2e] hover:bg-[#1f2d47] font-bold text-xs text-[#94a3b8] transition cursor-pointer border border-[#1e2a44]">
+          🧪 Reset to Test Samples
+        </button>
+      </div>
+
+      <!-- Live Congestion Injections -->
+      <div class="flex items-center gap-1.5 text-xs text-[#94a3b8] flex-wrap">
+        <span class="font-bold text-white text-[11px] mr-1">Quick Add:</span>
+        <button onclick="injectTraffic('North')" class="px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-500/40 hover:bg-sky-800 text-[#38bdf8] font-bold text-[11px] transition">+5 North</button>
+        <button onclick="injectTraffic('South')" class="px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-500/40 hover:bg-sky-800 text-[#38bdf8] font-bold text-[11px] transition">+5 South</button>
+        <button onclick="injectTraffic('East')" class="px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-500/40 hover:bg-sky-800 text-[#38bdf8] font-bold text-[11px] transition">+5 East</button>
+        <button onclick="injectTraffic('West')" class="px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-500/40 hover:bg-sky-800 text-[#38bdf8] font-bold text-[11px] transition">+5 West</button>
+      </div>
+    </div>
+
+    <!-- Dynamic Signal Toggled Notification Banner (Appears when new photo switches Green road) -->
+    <div id="toggleAlert" class="hidden p-3.5 rounded-2xl bg-gradient-to-r from-emerald-900/90 via-[#0d2238] to-[#09152b] border-2 border-emerald-400 shadow-2xl flex items-center justify-between gap-3 animate-pulse">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🚦</span>
+        <div>
+          <span class="text-xs font-black text-white uppercase tracking-wider block flex items-center gap-2" id="toggleAlertTitle">
+            SIGNAL TOGGLED TO NEW MAXIMUM TRAFFIC ROAD!
+          </span>
+          <span class="text-xs text-emerald-200" id="toggleAlertDetail">
+            New photo detected the maximum vehicle volume. Green signal has been automatically transferred.
+          </span>
+        </div>
+      </div>
+      <button onclick="document.getElementById('toggleAlert').classList.add('hidden')" class="text-xs font-bold text-white/70 hover:text-white px-2.5 py-1 rounded-lg bg-emerald-950 border border-emerald-500/40 cursor-pointer">
+        Dismiss &times;
+      </button>
+    </div>
+
+    <!-- Active Green Phase Announcement Banner -->
+    <div id="decisionBanner" class="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/90 via-sky-950/70 to-[#0b1120] border border-emerald-500 shadow-2xl flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3.5">
+        <span id="mainSignalLed" class="w-6 h-6 rounded-full bg-[#10b981] glow-green block shrink-0 animate-pulse"></span>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black uppercase tracking-wider text-[#38bdf8] bg-sky-950/80 px-2.5 py-0.5 rounded border border-sky-500/30">
+              ACTIVE SIGNAL DISCHARGE PHASE
+            </span>
+            <span id="transientBadge" class="hidden text-xs font-black uppercase tracking-wider text-amber-400 bg-amber-950/90 px-2.5 py-0.5 rounded border border-amber-500/50 animate-pulse">
+              TRANSITIONING (AMBER CLEARANCE)
+            </span>
+            <span id="inferBadge" class="hidden text-xs font-black uppercase tracking-wider text-purple-300 bg-purple-950/90 px-2.5 py-0.5 rounded border border-purple-500/50 animate-pulse">
+              YOLO INFERENCE ACTIVE
+            </span>
+          </div>
+          <h2 class="text-base sm:text-lg font-black text-emerald-300 uppercase tracking-wide mt-0.5" id="decisionTitle">
+            GREEN SIGNAL ALLOCATED TO EAST APPROACH
+          </h2>
+          <p class="text-xs text-[#cbd5e1]" id="decisionDetail">
+            Discharging East corridor. Real YOLOv8 detection found maximum traffic demand. Signal dynamically toggles green whenever a new photo with higher vehicle count is uploaded.
+          </p>
+        </div>
+      </div>
+      <div class="bg-[#070b16] border border-emerald-500/50 px-5 py-2.5 rounded-xl text-right shrink-0">
+        <span class="text-[10px] font-bold text-[#64748b] block uppercase tracking-wider">PHASE HOLD TIMER</span>
+        <span class="text-3xl font-black font-mono text-[#38bdf8]" id="countdownSecs">35s</span>
+      </div>
+    </div>
+
+    <!-- 3D Three.js Topographical Wave & Central Signal Section -->
+    <div class="relative w-full rounded-2xl bg-[#080d19] border border-[#1c2a44] overflow-hidden p-3 shadow-2xl">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-black text-[#00e676] uppercase tracking-wider">3D CYBERNETIC DIGITAL TWIN</span>
+          <span class="text-[11px] text-[#64748b]">&bull; Topographical Traffic Energy Waves &amp; Holographic Signal Gimbal</span>
+        </div>
+        <span class="text-[11px] font-mono text-[#38bdf8] bg-sky-950/60 px-2.5 py-0.5 rounded border border-sky-500/30">
+          AUTONOMOUS 3D DIGITAL TWIN &bull; STABILIZED ISOMETRIC PERSPECTIVE
+        </span>
+      </div>
+
+      <!-- Three.js Canvas Container -->
+      <div id="canvas3d-container"></div>
+    </div>
+
+    <!-- 4-Direction Crossroad Layout (North, South, East, West Photo Cards + Central Signal Light) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center justify-items-center py-2">
+      
+      <!-- West (Left) -->
+      <div class="w-full flex flex-col items-center justify-center">
+        <div id="cardWest" class="w-full bg-[#0d1527] border border-[#1e2a44] rounded-2xl p-3.5 space-y-2.5 transition-all">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-xs font-black text-white flex items-center gap-1.5">
+                <span class="text-[#38bdf8]">◄</span> WEST APPROACH
+              </span>
+              <span id="badgeWest" class="hidden px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                👑 MAX VEHICLES
+              </span>
+            </div>
+            <span id="pillWest" class="px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-red-950 text-red-300 border border-red-500/40">
+              RED (STOP)
+            </span>
+          </div>
+
+          <!-- Upload Dropzone / Preview Box -->
+          <div class="w-full preview-box bg-[#060a12] border border-[#1e2a44] rounded-xl overflow-hidden flex items-center justify-center relative upload-box cursor-pointer" id="dropWest">
+            <input type="file" id="inputWest" class="hidden" accept="image/*">
+            <img id="imgWest" class="w-full h-full object-cover" src="" alt="West Traffic">
+            <div id="loaderWest" class="absolute inset-0 bg-black/80 backdrop-blur-sm hidden flex flex-col items-center justify-center gap-2 text-center p-3 z-20">
+              <div class="w-7 h-7 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+              <span class="text-xs font-bold text-white">YOLOv8 Detecting...</span>
+              <span class="text-[10px] text-sky-400">Counting Vehicles &amp; Density</span>
+            </div>
+            <div class="absolute inset-0 upload-overlay opacity-0 flex flex-col items-center justify-center gap-1 text-center p-2 z-10">
+              <span class="text-xl">📷</span>
+              <span class="text-xs font-bold text-white">Click or Drop Photo</span>
+              <span class="text-[10px] text-[#38bdf8]">Real YOLOv8 Detection</span>
+            </div>
+          </div>
+
+          <!-- Approach Metrics -->
+          <div class="space-y-1.5 pt-1 border-t border-[#1e2a44]">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-mono font-black text-white" id="countWest">20 veh</span>
+              <span class="font-mono text-[#38bdf8] text-[11px]" id="densWest">66.7% Density</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-mono">
+              <span class="text-amber-400 font-semibold" id="waitWest">⏳ Wait: 30s (+3.0)</span>
+              <span class="text-purple-300 font-bold" id="priorityWest">Priority: 23.0</span>
+            </div>
+            <div class="w-full h-2 bg-[#1e293b] rounded-full overflow-hidden">
+              <div id="barWest" class="h-full bg-amber-500 transition-all duration-500" style="width: 66.7%"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-[#94a3b8] font-mono">
+              <span id="classesWest">Cars: 20</span>
+              <label class="text-[#38bdf8] hover:underline cursor-pointer font-bold" onclick="event.stopPropagation(); document.getElementById('inputWest').click()">📁 Change Photo</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Column: North (Top) + Central Signal Light (Middle) + South (Bottom) -->
+      <div class="w-full flex flex-col items-center gap-4">
+        
+        <!-- North (Top) -->
+        <div id="cardNorth" class="w-full bg-[#0d1527] border border-[#1e2a44] rounded-2xl p-3.5 space-y-2.5 transition-all">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-xs font-black text-white flex items-center gap-1.5">
+                <span class="text-[#38bdf8]">▲</span> NORTH APPROACH
+              </span>
+              <span id="badgeNorth" class="hidden px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                👑 MAX VEHICLES
+              </span>
+            </div>
+            <span id="pillNorth" class="px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-red-950 text-red-300 border border-red-500/40">
+              RED (STOP)
+            </span>
+          </div>
+
+          <!-- Upload Dropzone / Preview Box -->
+          <div class="w-full preview-box bg-[#060a12] border border-[#1e2a44] rounded-xl overflow-hidden flex items-center justify-center relative upload-box cursor-pointer" id="dropNorth">
+            <input type="file" id="inputNorth" class="hidden" accept="image/*">
+            <img id="imgNorth" class="w-full h-full object-cover" src="" alt="North Traffic">
+            <div id="loaderNorth" class="absolute inset-0 bg-black/80 backdrop-blur-sm hidden flex flex-col items-center justify-center gap-2 text-center p-3 z-20">
+              <div class="w-7 h-7 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+              <span class="text-xs font-bold text-white">YOLOv8 Detecting...</span>
+              <span class="text-[10px] text-sky-400">Counting Vehicles &amp; Density</span>
+            </div>
+            <div class="absolute inset-0 upload-overlay opacity-0 flex flex-col items-center justify-center gap-1 text-center p-2 z-10">
+              <span class="text-xl">📷</span>
+              <span class="text-xs font-bold text-white">Click or Drop Photo</span>
+              <span class="text-[10px] text-[#38bdf8]">Real YOLOv8 Detection</span>
+            </div>
+          </div>
+
+          <!-- Approach Metrics -->
+          <div class="space-y-1.5 pt-1 border-t border-[#1e2a44]">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-mono font-black text-white" id="countNorth">8 veh</span>
+              <span class="font-mono text-[#38bdf8] text-[11px]" id="densNorth">26.7% Density</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-mono">
+              <span class="text-amber-400 font-semibold" id="waitNorth">⏳ Wait: 60s (+6.0)</span>
+              <span class="text-purple-300 font-bold" id="priorityNorth">Priority: 14.0</span>
+            </div>
+            <div class="w-full h-2 bg-[#1e293b] rounded-full overflow-hidden">
+              <div id="barNorth" class="h-full bg-emerald-500 transition-all duration-500" style="width: 26.7%"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-[#94a3b8] font-mono">
+              <span id="classesNorth">Cars: 5 | Bikes: 2 | Trucks: 1</span>
+              <label class="text-[#38bdf8] hover:underline cursor-pointer font-bold" onclick="event.stopPropagation(); document.getElementById('inputNorth').click()">📁 Change Photo</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Central Traffic Signal Intersection Pole -->
+        <div class="relative w-60 h-60 rounded-3xl bg-[#090f1d] border-2 border-[#1e2a44] flex items-center justify-center p-3 shadow-2xl">
+          <!-- Central Dynamic Hub -->
+          <div class="w-28 h-28 rounded-full bg-[#111c33] border-2 border-[#25395c] flex flex-col items-center justify-center text-center p-2 z-10 shadow-inner">
+            <span class="text-[9px] font-black text-[#64748b] tracking-wider uppercase">TRAFFIC LIGHT</span>
+            <span id="centerCountdown" class="text-2xl font-black font-mono text-[#38bdf8] my-0.5">35s</span>
+            <span id="centerWinnerBadge" class="text-[10px] font-black text-[#00e676] uppercase tracking-wide">EAST GO</span>
+          </div>
+
+          <!-- North Signal Head -->
+          <div class="absolute top-2.5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
+            <span id="lampNorth" class="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-red-600 text-white glow-red">STOP</span>
+            <span class="text-[9px] font-bold text-[#64748b]">▲ NORTH</span>
+          </div>
+
+          <!-- South Signal Head -->
+          <div class="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
+            <span class="text-[9px] font-bold text-[#64748b]">▼ SOUTH</span>
+            <span id="lampSouth" class="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-red-600 text-white glow-red">STOP</span>
+          </div>
+
+          <!-- West Signal Head -->
+          <div class="absolute left-2.5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5">
+            <span class="text-[9px] font-bold text-[#64748b]">◄ WEST</span>
+            <span id="lampWest" class="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-red-600 text-white glow-red">STOP</span>
+          </div>
+
+          <!-- East Signal Head -->
+          <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5">
+            <span class="text-[9px] font-bold text-[#64748b]">EAST ►</span>
+            <span id="lampEast" class="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-500 text-white glow-green">GO</span>
+          </div>
+        </div>
+
+        <!-- South (Bottom) -->
+        <div id="cardSouth" class="w-full bg-[#0d1527] border border-[#1e2a44] rounded-2xl p-3.5 space-y-2.5 transition-all">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-xs font-black text-white flex items-center gap-1.5">
+                <span class="text-[#38bdf8]">▼</span> SOUTH APPROACH
+              </span>
+              <span id="badgeSouth" class="hidden px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                👑 MAX VEHICLES
+              </span>
+            </div>
+            <span id="pillSouth" class="px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-red-950 text-red-300 border border-red-500/40">
+              RED (STOP)
+            </span>
+          </div>
+
+          <!-- Upload Dropzone / Preview Box -->
+          <div class="w-full preview-box bg-[#060a12] border border-[#1e2a44] rounded-xl overflow-hidden flex items-center justify-center relative upload-box cursor-pointer" id="dropSouth">
+            <input type="file" id="inputSouth" class="hidden" accept="image/*">
+            <img id="imgSouth" class="w-full h-full object-cover" src="" alt="South Traffic">
+            <div id="loaderSouth" class="absolute inset-0 bg-black/80 backdrop-blur-sm hidden flex flex-col items-center justify-center gap-2 text-center p-3 z-20">
+              <div class="w-7 h-7 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+              <span class="text-xs font-bold text-white">YOLOv8 Detecting...</span>
+              <span class="text-[10px] text-sky-400">Counting Vehicles &amp; Density</span>
+            </div>
+            <div class="absolute inset-0 upload-overlay opacity-0 flex flex-col items-center justify-center gap-1 text-center p-2 z-10">
+              <span class="text-xl">📷</span>
+              <span class="text-xs font-bold text-white">Click or Drop Photo</span>
+              <span class="text-[10px] text-[#38bdf8]">Real YOLOv8 Detection</span>
+            </div>
+          </div>
+
+          <!-- Approach Metrics -->
+          <div class="space-y-1.5 pt-1 border-t border-[#1e2a44]">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-mono font-black text-white" id="countSouth">14 veh</span>
+              <span class="font-mono text-[#38bdf8] text-[11px]" id="densSouth">46.7% Density</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-mono">
+              <span class="text-amber-400 font-semibold" id="waitSouth">⏳ Wait: 45s (+4.5)</span>
+              <span class="text-purple-300 font-bold" id="prioritySouth">Priority: 18.5</span>
+            </div>
+            <div class="w-full h-2 bg-[#1e293b] rounded-full overflow-hidden">
+              <div id="barSouth" class="h-full bg-amber-500 transition-all duration-500" style="width: 46.7%"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-[#94a3b8] font-mono">
+              <span id="classesSouth">Cars: 8 | Trucks: 6</span>
+              <label class="text-[#38bdf8] hover:underline cursor-pointer font-bold" onclick="event.stopPropagation(); document.getElementById('inputSouth').click()">📁 Change Photo</label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- East (Right) -->
+      <div class="w-full flex flex-col items-center justify-center">
+        <div id="cardEast" class="w-full bg-[#0d1527] border border-[#1e2a44] rounded-2xl p-3.5 space-y-2.5 transition-all card-active-green">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-xs font-black text-white flex items-center gap-1.5">
+                <span class="text-[#38bdf8]">►</span> EAST APPROACH
+              </span>
+              <span id="badgeEast" class="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                👑 MAX VEHICLES
+              </span>
+            </div>
+            <span id="pillEast" class="px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-emerald-950 text-emerald-300 border border-emerald-500/50">
+              GREEN (GO)
+            </span>
+          </div>
+
+          <!-- Upload Dropzone / Preview Box -->
+          <div class="w-full preview-box bg-[#060a12] border border-[#1e2a44] rounded-xl overflow-hidden flex items-center justify-center relative upload-box cursor-pointer" id="dropEast">
+            <input type="file" id="inputEast" class="hidden" accept="image/*">
+            <img id="imgEast" class="w-full h-full object-cover" src="" alt="East Traffic">
+            <div id="loaderEast" class="absolute inset-0 bg-black/80 backdrop-blur-sm hidden flex flex-col items-center justify-center gap-2 text-center p-3 z-20">
+              <div class="w-7 h-7 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+              <span class="text-xs font-bold text-white">YOLOv8 Detecting...</span>
+              <span class="text-[10px] text-sky-400">Counting Vehicles &amp; Density</span>
+            </div>
+            <div class="absolute inset-0 upload-overlay opacity-0 flex flex-col items-center justify-center gap-1 text-center p-2 z-10">
+              <span class="text-xl">📷</span>
+              <span class="text-xs font-bold text-white">Click or Drop Photo</span>
+              <span class="text-[10px] text-[#38bdf8]">Real YOLOv8 Detection</span>
+            </div>
+          </div>
+
+          <!-- Approach Metrics -->
+          <div class="space-y-1.5 pt-1 border-t border-[#1e2a44]">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-mono font-black text-white" id="countEast">29 veh</span>
+              <span class="font-mono text-[#38bdf8] text-[11px]" id="densEast">96.7% Density</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-mono">
+              <span class="text-emerald-400 font-semibold" id="waitEast">🟢 Active Green (0s wait)</span>
+              <span class="text-purple-300 font-bold" id="priorityEast">Priority: 29.0</span>
+            </div>
+            <div class="w-full h-2 bg-[#1e293b] rounded-full overflow-hidden">
+              <div id="barEast" class="h-full bg-emerald-500 transition-all duration-500" style="width: 96.7%"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-[#94a3b8] font-mono">
+              <span id="classesEast">Cars: 28 | Buses: 1</span>
+              <label class="text-[#38bdf8] hover:underline cursor-pointer font-bold" onclick="event.stopPropagation(); document.getElementById('inputEast').click()">📁 Change Photo</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Comparative Real-Time Density & Queue Balancing Matrix -->
+    <div class="p-4 rounded-2xl bg-[#0d1424] border border-[#1e2a44] space-y-3 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Live 4-Direction Queue &amp; Density Balancing Matrix</h3>
+        <span class="text-[11px] text-[#64748b]">Real-Time Conservation: Net $\Delta N = \text{Arrivals from Rear} - \text{Green Discharge}$</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs" id="matrixContainer"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="pt-3 border-t border-[#1c2a44] text-[11px] text-[#64748b] flex items-center justify-between flex-wrap gap-2">
+      <span>VegMitra Autonomous AI Signal Controller &bull; Powered by Fine-Tuned YOLOv8 &bull; Three.js Digital Twin</span>
+      <span class="text-emerald-400 font-medium">&ldquo;Autonomous AI Signals for Greener, Flowing Cities&rdquo;</span>
+    </footer>
+
+  </div>
+
+  <!-- Load 3D Engine -->
+  <script src="traffic_3d.js"></script>
+
+  <!-- Continuous Adaptive Simulation & AI Vision Integration Script -->
+  <script>
+    (function() {
+      const CLOCKWISE_ROADS = ['North', 'East', 'South', 'West'];
+      const ROADS = ['North', 'East', 'South', 'West'];
+
+      // Capacity is 30 vehicles per approach
+      const ROAD_CAPACITY = 30;
+
+      // Strict Density Calculator: Guaranteed to NEVER exceed 100.0%
+      function calcDensity(count) {
+        if (!count || count <= 0) return 0.0;
+        const pct = (count / ROAD_CAPACITY) * 100.0;
+        return Math.min(100.0, Math.max(0.0, Math.round(pct * 10) / 10));
+      }
+
+      // Active Road State with Waiting-Time Aging Tracking
+      let roadData = {
+        North: { count: 8, density: 26.7, signal: 'RED', rawImage: '', annotatedImage: '', classes: { car: 5, motorcycle: 2, truck: 1, bus: 0 }, waitSeconds: 60 },
+        South: { count: 14, density: 46.7, signal: 'RED', rawImage: '', annotatedImage: '', classes: { car: 8, truck: 6, motorcycle: 0, bus: 0 }, waitSeconds: 45 },
+        East: { count: 29, density: 96.7, signal: 'GREEN', rawImage: '', annotatedImage: '', classes: { car: 28, bus: 1, motorcycle: 0, truck: 0 }, waitSeconds: 0 },
+        West: { count: 20, density: 66.7, signal: 'RED', rawImage: '', annotatedImage: '', classes: { car: 20, motorcycle: 0, bus: 0, truck: 0 }, waitSeconds: 30 }
+      };
+
+      let activeWinner = 'East';
+      let nextCandidateRoad = 'South';
+      let phaseCountdown = 35;
+      let isDemoSimulationRunning = false; // Real Photo AI Detection is default!
+      let isAmberTransition = false;
+      let visualizer3D = null;
+      let isInferencing = false;
+
+      // 1. Initialize 3D Engine & Load Initial State
+      window.addEventListener('DOMContentLoaded', () => {
+        try {
+          if (window.THREE && window.Traffic3DVisualizer) {
+            visualizer3D = new Traffic3DVisualizer('canvas3d-container');
+            visualizer3D.setSignalState(activeWinner, roadData[activeWinner].density, false);
+          }
+        } catch (e) {
+          console.warn('3D initialization note:', e);
+        }
+        loadInitialSamples();
+      });
+
+      // 2. Fetch Sample Images from Server
+      async function loadInitialSamples() {
+        try {
+          const resp = await fetch('sample_analysis.json');
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.approaches) {
+              ROADS.forEach(rd => {
+                if (data.approaches[rd]) {
+                  roadData[rd].annotatedImage = data.approaches[rd].annotated_image || '';
+                  roadData[rd].count = data.approaches[rd].count || 0;
+                  roadData[rd].density = calcDensity(roadData[rd].count);
+                  roadData[rd].classes = data.approaches[rd].classes || { car: 0, motorcycle: 0, bus: 0, truck: 0 };
+                  if (data.approaches[rd].wait_seconds != null) {
+                    roadData[rd].waitSeconds = data.approaches[rd].wait_seconds;
+                  }
+                }
+              });
+            }
+            if (data.selected_green_road) {
+              activeWinner = data.selected_green_road;
+            }
+          }
+          const rawResp = await fetch('sample_raw_images.json');
+          if (rawResp.ok) {
+            const raws = await rawResp.json();
+            ROADS.forEach(rd => {
+              if (raws[rd]) {
+                roadData[rd].rawImage = raws[rd];
+              }
+            });
+          }
+        } catch (err) {
+          console.warn('Sample load note:', err);
+        }
+        reEvaluateWinnerFromCounts(false);
+        updateUI();
+      }
+
+      // Re-evaluate road with maximum vehicles / priority score (Count + 0.1 * Wait)
+      function reEvaluateWinnerFromCounts(triggerAlert = true) {
+        let maxScore = -1;
+        let winner = activeWinner;
+
+        ROADS.forEach(rd => {
+          const count = roadData[rd].count || 0;
+          const wait = (rd === activeWinner) ? 0 : (roadData[rd].waitSeconds || 0);
+          const score = Math.round((count + (0.1 * wait)) * 10) / 10;
+          if (score > maxScore) {
+            maxScore = score;
+            winner = rd;
+          }
+        });
+
+        if (winner !== activeWinner) {
+          const prev = activeWinner;
+          activeWinner = winner;
+          phaseCountdown = Math.max(15, Math.min(60, Math.round(roadData[winner].count * 2.2)));
+          if (triggerAlert) {
+            showSignalToggleAlert(prev, winner, roadData[winner].count, roadData[winner].density, "PHOTO");
+          }
+        }
+      }
+
+      // 3. User Injection of Congestion for Testing
+      window.injectTraffic = function(road) {
+        roadData[road].count = Math.min(50, roadData[road].count + 5);
+        roadData[road].density = calcDensity(roadData[road].count);
+        reEvaluateWinnerFromCounts(true);
+        updateUI();
+      };
+
+      // 4. Update UI Components
+      function updateUI() {
+        // Countdown displays
+        const countdownEl = document.getElementById('countdownSecs');
+        const centerCountEl = document.getElementById('centerCountdown');
+        const centerBadgeEl = document.getElementById('centerWinnerBadge');
+
+        if (countdownEl) countdownEl.textContent = phaseCountdown + 's';
+        if (centerCountEl) centerCountEl.textContent = isAmberTransition ? 'AMBER' : phaseCountdown + 's';
+        if (centerBadgeEl) centerBadgeEl.textContent = isAmberTransition ? 'WAIT' : `${activeWinner.toUpperCase()} GO`;
+
+        // Update Decision Banner
+        const bannerTitle = document.getElementById('decisionTitle');
+        const bannerDetail = document.getElementById('decisionDetail');
+        const transientBadge = document.getElementById('transientBadge');
+        const mainLed = document.getElementById('mainSignalLed');
+        const inferBadge = document.getElementById('inferBadge');
+
+        if (inferBadge) {
+          inferBadge.classList.toggle('hidden', !isInferencing);
+        }
+
+        if (isAmberTransition) {
+          if (transientBadge) transientBadge.classList.remove('hidden');
+          if (bannerTitle) bannerTitle.innerHTML = `TRANSITIONING &bull; SWITCHING GREEN TO ${nextCandidateRoad.toUpperCase()}`;
+          if (bannerDetail) bannerDetail.textContent = `Amber clearance underway (2s). Signal transferring to ${nextCandidateRoad} (${roadData[nextCandidateRoad].count} veh, ${roadData[nextCandidateRoad].density}% density).`;
+          if (mainLed) mainLed.className = 'w-6 h-6 rounded-full bg-amber-500 glow-amber block shrink-0 animate-pulse';
+        } else {
+          if (transientBadge) transientBadge.classList.add('hidden');
+          if (bannerTitle) bannerTitle.textContent = `GREEN SIGNAL ALLOCATED TO ${activeWinner.toUpperCase()} APPROACH`;
+          const winnerStats = roadData[activeWinner];
+          const classDesc = formatClasses(winnerStats.classes);
+          if (bannerDetail) {
+            bannerDetail.textContent = `Real YOLOv8 detection confirmed ${winnerStats.count} vehicles (${classDesc}) on ${activeWinner} approach producing ${winnerStats.density}% density. Maximum traffic volume across all approaches — all other signals held RED.`;
+          }
+          if (mainLed) mainLed.className = 'w-6 h-6 rounded-full bg-[#10b981] glow-green block shrink-0 animate-pulse';
+        }
+
+        // Update 4 Approach Cards
+        ROADS.forEach(rd => {
+          const isGreen = rd === activeWinner && !isAmberTransition;
+          const isAmber = rd === activeWinner && isAmberTransition;
+          const card = document.getElementById('card' + rd);
+          const pill = document.getElementById('pill' + rd);
+          const lamp = document.getElementById('lamp' + rd);
+          const countEl = document.getElementById('count' + rd);
+          const densEl = document.getElementById('dens' + rd);
+          const barEl = document.getElementById('bar' + rd);
+          const imgEl = document.getElementById('img' + rd);
+          const badgeEl = document.getElementById('badge' + rd);
+          const classesEl = document.getElementById('classes' + rd);
+
+          if (card) {
+            card.classList.toggle('card-active-green', isGreen);
+            card.classList.toggle('card-active-amber', isAmber);
+          }
+
+          if (badgeEl) {
+            badgeEl.classList.toggle('hidden', !isGreen);
+          }
+
+          if (pill) {
+            if (isGreen) {
+              pill.textContent = 'GREEN (GO)';
+              pill.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-emerald-950 text-emerald-300 border border-emerald-500/50';
+            } else if (isAmber) {
+              pill.textContent = 'AMBER (SLOW)';
+              pill.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-amber-950 text-amber-300 border border-amber-500/50';
+            } else {
+              pill.textContent = 'RED (STOP)';
+              pill.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-red-950 text-red-300 border border-red-500/40';
+            }
+          }
+
+          if (lamp) {
+            if (isGreen) {
+              lamp.textContent = 'GO';
+              lamp.className = 'px-2.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-500 text-white glow-green';
+            } else if (isAmber) {
+              lamp.textContent = 'SLOW';
+              lamp.className = 'px-2.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-white glow-amber';
+            } else {
+              lamp.textContent = 'STOP';
+              lamp.className = 'px-2.5 py-0.5 rounded-full text-[9px] font-black bg-red-600 text-white glow-red';
+            }
+          }
+
+          const currentDens = calcDensity(roadData[rd].count);
+          roadData[rd].density = currentDens;
+
+          const waitEl = document.getElementById('wait' + rd);
+          const priorityEl = document.getElementById('priority' + rd);
+          const waitSecs = isGreen ? 0 : (roadData[rd].waitSeconds || 0);
+          const waitBoost = Math.round(waitSecs * 0.1 * 10) / 10;
+          const priorityScore = Math.round(((roadData[rd].count || 0) + waitBoost) * 10) / 10;
+
+          if (waitEl) {
+            if (isGreen) {
+              waitEl.textContent = '🟢 Active Green (0s wait)';
+              waitEl.className = 'text-emerald-400 font-semibold';
+            } else if (isAmber) {
+              waitEl.textContent = '🟡 Clearing (Amber)';
+              waitEl.className = 'text-amber-400 font-semibold';
+            } else {
+              waitEl.textContent = `⏳ Wait: ${waitSecs}s (+${waitBoost.toFixed(1)})`;
+              waitEl.className = waitSecs > 60 ? 'text-rose-400 font-bold' : 'text-amber-400 font-semibold';
+            }
+          }
+          if (priorityEl) {
+            priorityEl.textContent = `Priority: ${priorityScore.toFixed(1)}`;
+          }
+
+          if (countEl) countEl.textContent = `${roadData[rd].count} veh`;
+          if (densEl) densEl.textContent = `${currentDens.toFixed(1)}% Density`;
+          if (barEl) {
+            barEl.style.width = `${Math.min(100, currentDens)}%`;
+            barEl.className = isGreen
+              ? 'h-full bg-emerald-500 transition-all duration-500'
+              : currentDens > 70
+              ? 'h-full bg-red-500 transition-all duration-500'
+              : 'h-full bg-amber-500 transition-all duration-500';
+          }
+
+          if (classesEl && roadData[rd].classes) {
+            classesEl.textContent = formatClasses(roadData[rd].classes);
+          }
+
+          if (imgEl && (roadData[rd].annotatedImage || roadData[rd].rawImage)) {
+            imgEl.src = roadData[rd].annotatedImage || roadData[rd].rawImage;
+          }
+        });
+
+        // Update Density & Wait Time Balancing Matrix
+        const matrixEl = document.getElementById('matrixContainer');
+        if (matrixEl) {
+          let html = '';
+          ROADS.forEach(rd => {
+            const isWin = rd === activeWinner && !isAmberTransition;
+            const isAm = rd === activeWinner && isAmberTransition;
+            const den = calcDensity(roadData[rd].count);
+            const cnt = roadData[rd].count;
+            const waitSecs = isWin ? 0 : (roadData[rd].waitSeconds || 0);
+            const waitBoost = Math.round(waitSecs * 0.1 * 10) / 10;
+            const priorityScore = Math.round((cnt + waitBoost) * 10) / 10;
+            const barColor = isWin ? 'bg-emerald-500' : isAm ? 'bg-amber-500' : den > 70 ? 'bg-red-500' : 'bg-amber-500';
+
+            html += `
+              <div class="p-3 rounded-xl ${isWin ? 'bg-emerald-950/40 border border-emerald-500/60 shadow-lg' : isAm ? 'bg-amber-950/40 border border-amber-500/60' : 'bg-[#0a101d] border border-[#1e2a44]'}">
+                <div class="flex justify-between font-bold text-white mb-1">
+                  <span class="flex items-center gap-1">${rd} Approach ${isWin ? '👑' : ''}</span>
+                  <span class="${isWin ? 'text-emerald-400 font-mono font-black' : isAm ? 'text-amber-400 font-mono font-black' : 'text-red-400 font-mono'}">${isWin ? 'GREEN (GO)' : isAm ? 'AMBER (SLOW)' : 'RED (STOP)'}</span>
+                </div>
+                <div class="text-base font-black font-mono ${isWin ? 'text-emerald-300' : 'text-white'}">${cnt} <span class="text-xs font-normal text-[#64748b]">veh</span></div>
+                <div class="text-[11px] text-[#38bdf8] font-mono">${den.toFixed(1)}% Real Density</div>
+                <div class="w-full h-1.5 bg-[#1e293b] rounded-full mt-2 overflow-hidden">
+                  <div class="h-full ${barColor} transition-all duration-500" style="width: ${Math.min(100, den)}%"></div>
+                </div>
+                <div class="flex justify-between items-center text-[10px] font-mono mt-1.5 text-[#94a3b8]">
+                  <span class="${isWin ? 'text-emerald-400 font-semibold' : waitSecs > 60 ? 'text-rose-400 font-bold' : 'text-amber-400'}">⏳ Wait: ${waitSecs}s (+${waitBoost.toFixed(1)})</span>
+                  <span class="text-purple-300 font-bold">Priority: ${priorityScore.toFixed(1)}</span>
+                </div>
+              </div>
+            `;
+          });
+          matrixEl.innerHTML = html;
+        }
+
+        // Update 3D Visualizer
+        if (visualizer3D) {
+          visualizer3D.setSignalState(activeWinner, roadData[activeWinner].density, isAmberTransition);
+        }
+      }
+
+      function formatClasses(classesObj) {
+        if (!classesObj) return '0 veh';
+        const parts = [];
+        if (classesObj.car) parts.push(`${classesObj.car} Car${classesObj.car > 1 ? 's' : ''}`);
+        if (classesObj.motorcycle) parts.push(`${classesObj.motorcycle} Bike${classesObj.motorcycle > 1 ? 's' : ''}`);
+        if (classesObj.bus) parts.push(`${classesObj.bus} Bus${classesObj.bus > 1 ? 'es' : ''}`);
+        if (classesObj.truck) parts.push(`${classesObj.truck} Truck${classesObj.truck > 1 ? 's' : ''}`);
+        return parts.length ? parts.join(' | ') : '0 veh detected';
+      }
+
+      // Show eye-catching Signal Toggled Alert Banner
+      function showSignalToggleAlert(prevRoad, newRoad, count, density, reason = "PHOTO") {
+        const alertEl = document.getElementById('toggleAlert');
+        const titleEl = document.getElementById('toggleAlertTitle');
+        const detailEl = document.getElementById('toggleAlertDetail');
+        if (alertEl && titleEl && detailEl) {
+          const waitSec = (roadData[newRoad] && roadData[newRoad].waitSeconds) || 0;
+          const boost = (waitSec * 0.1).toFixed(1);
+          const prio = (count + 0.1 * waitSec).toFixed(1);
+
+          if (reason === "TIMER") {
+            titleEl.innerHTML = `🚦 PHASE ROTATED: GREEN SWITCHED FROM ${prevRoad.toUpperCase()} &rarr; ${newRoad.toUpperCase()}!`;
+            detailEl.textContent = `Clearance timer ended on ${prevRoad}. Anti-starvation & wait-time priority engaged: assigned green to ${newRoad} (${count} veh + ${waitSec}s wait → score: ${prio}) for ${phaseCountdown}s clearance.`;
+          } else {
+            titleEl.innerHTML = `📷 SIGNAL TOGGLED: GREEN SWITCHED FROM ${prevRoad.toUpperCase()} &rarr; ${newRoad.toUpperCase()}!`;
+            detailEl.textContent = `New photo detection found ${count} vehicles (${density.toFixed(1)}% real queue density) on ${newRoad}. Priority score ${prio} (waited ${waitSec}s, +${boost} boost) leads all approaches!`;
+          }
+          alertEl.classList.remove('hidden');
+          // Auto-hide alert after 8 seconds
+          setTimeout(() => {
+            alertEl.classList.add('hidden');
+          }, 8000);
+        }
+      }
+
+      // Select the next appropriate lane excluding currentRoad to prevent starvation:
+      // 1. Candidate pool: other 3 roads in strict clockwise sequence starting immediately after currentRoad
+      // 2. Waiting Time Aging Priority: Score = Vehicle Count + (0.1 * Waiting Seconds)
+      //    A lane waiting 60s gets +6.0 priority boost, outbidding fresher lanes
+      // 3. Different priority score: candidate with maximum priority score wins
+      // 4. Same priority score (tie): candidate next in clockwise iteration sequence wins
+      function getNextAppropriateRoad(currentRoad) {
+        let curIdx = CLOCKWISE_ROADS.indexOf(currentRoad);
+        if (curIdx === -1) curIdx = 0;
+
+        const candidateOrder = [];
+        for (let i = 1; i < 4; i++) {
+          candidateOrder.push(CLOCKWISE_ROADS[(curIdx + i) % 4]);
+        }
+
+        let highestPriority = -1;
+        let selectedRoad = candidateOrder[0]; // Clockwise-next default
+
+        for (const rd of candidateOrder) {
+          const stats = roadData[rd] || {};
+          const count = stats.count != null ? stats.count : 0;
+          const wait = stats.waitSeconds != null ? stats.waitSeconds : 0;
+          // Priority score = Vehicle Count + (0.1 * Waiting Seconds)
+          const priority = Math.round((count + (0.1 * wait)) * 10) / 10;
+
+          if (priority > highestPriority) {
+            highestPriority = priority;
+            selectedRoad = rd;
+          }
+          // Note: If priority === highestPriority (tie), candidateOrder maintains
+          // the strict clockwise iteration priority, so selectedRoad is not overwritten.
+        }
+
+        return selectedRoad;
+      }
+
+      // Handle green light phase countdown reaching 0
+      function handlePhaseTimerExpiry() {
+        const currentRoad = activeWinner;
+        const nextRoad = getNextAppropriateRoad(currentRoad);
+        const nextWait = (roadData[nextRoad] && roadData[nextRoad].waitSeconds) || 0;
+        const nextPrio = ((roadData[nextRoad].count || 0) + 0.1 * nextWait).toFixed(1);
+
+        console.log(`[Timer Expired] Green phase ended on ${currentRoad}. Anti-starvation triggered. Excluded: ${currentRoad}. Next chosen road: ${nextRoad} (Wait: ${nextWait}s, Priority Score: ${nextPrio})`);
+
+        // Initiate 2s Amber clearance before next green phase
+        isAmberTransition = true;
+        nextCandidateRoad = nextRoad;
+        phaseCountdown = 2; // 2 seconds amber clearance
+        updateUI();
+      }
+
+      // Synchronize timer-expired phase rotation to backend if server is active
+      async function syncTimerExpireToBackend(currentRoad) {
+        try {
+          await fetch('/api/timer-expire', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_road: currentRoad })
+          });
+        } catch (e) {
+          // Running client-side or offline
+        }
+      }
+
+      // Apply analysis result from YOLO model
+      function applyAnalysisResult(data) {
+        const previousWinner = activeWinner;
+        const newWinner = data.selected_green_road || activeWinner;
+
+        if (data.approaches) {
+          ROADS.forEach(rd => {
+            if (data.approaches[rd]) {
+              const res = data.approaches[rd];
+              roadData[rd].count = res.count || 0;
+              roadData[rd].density = calcDensity(res.count);
+              if (res.wait_seconds != null) {
+                roadData[rd].waitSeconds = res.wait_seconds;
+              }
+              if (res.annotated_image) {
+                roadData[rd].annotatedImage = res.annotated_image;
+              }
+              if (res.classes) {
+                roadData[rd].classes = res.classes;
+              }
+            }
+          });
+        }
+
+        activeWinner = newWinner;
+        roadData[newWinner].waitSeconds = 0;
+        phaseCountdown = data.green_time_seconds || Math.max(15, Math.min(60, Math.round(roadData[newWinner].count * 2.2)));
+        isAmberTransition = false;
+
+        // Trigger notification if green road toggled!
+        if (previousWinner !== newWinner) {
+          showSignalToggleAlert(previousWinner, newWinner, roadData[newWinner].count, roadData[newWinner].density, "PHOTO");
+        }
+
+        updateUI();
+      }
+
+      // 5. Simulation & Phase Countdown Clock
+      function simulationTick() {
+        if (isInferencing) return;
+
+        // When Amber Transition is running (2s clearance before switching to new lane):
+        if (isAmberTransition) {
+          phaseCountdown--;
+          if (phaseCountdown <= 0) {
+            isAmberTransition = false;
+            const prevWinner = activeWinner;
+            activeWinner = nextCandidateRoad;
+            nextCandidateRoad = null;
+            roadData[activeWinner].waitSeconds = 0;
+
+            // Allocate dynamic green time based on real vehicle count of new winner
+            const winCount = (roadData[activeWinner] && roadData[activeWinner].count) || 0;
+            phaseCountdown = Math.max(15, Math.min(60, Math.round(winCount * 2.2)));
+
+            showSignalToggleAlert(prevWinner, activeWinner, roadData[activeWinner].count, roadData[activeWinner].density, "TIMER");
+            syncTimerExpireToBackend(prevWinner);
+          }
+          updateUI();
+          return;
+        }
+
+        // Accumulate waiting time for RED roads, keep 0 for active GREEN road
+        ROADS.forEach(rd => {
+          if (rd === activeWinner && !isAmberTransition) {
+            roadData[rd].waitSeconds = 0;
+          } else {
+            roadData[rd].waitSeconds = (roadData[rd].waitSeconds || 0) + 1;
+          }
+        });
+
+        // When in DEMO SIMULATION MODE (optional vehicle flow simulation):
+        if (isDemoSimulationRunning) {
+          if (roadData[activeWinner].count > 0) {
+            const discharge = 1;
+            const arrival = Math.random() < 0.4 ? 1 : 0;
+            roadData[activeWinner].count = Math.max(0, roadData[activeWinner].count - discharge + arrival);
+            roadData[activeWinner].density = calcDensity(roadData[activeWinner].count);
+          }
+          ROADS.forEach(rd => {
+            if (rd !== activeWinner && Math.random() < 0.5) {
+              roadData[rd].count = Math.min(35, roadData[rd].count + 1);
+              roadData[rd].density = calcDensity(roadData[rd].count);
+            }
+          });
+        }
+
+        // Active Green Phase Countdown
+        phaseCountdown--;
+
+        // When timer ends: change to next appropriate road excluding current road!
+        if (phaseCountdown <= 0) {
+          handlePhaseTimerExpiry();
+        } else {
+          const countdownEl = document.getElementById('countdownSecs');
+          const centerCountEl = document.getElementById('centerCountdown');
+          if (countdownEl) countdownEl.textContent = phaseCountdown + 's';
+          if (centerCountEl) centerCountEl.textContent = phaseCountdown + 's';
+        }
+
+        updateUI();
+      }
+
+      setInterval(simulationTick, 1000);
+
+      // 6. User Photo Upload & Live YOLO Inference Execution for All 4 Directions
+      async function executeYoloInference() {
+        if (isInferencing) return;
+        isInferencing = true;
+
+        const inferBtn = document.getElementById('btnRunInference');
+        const inferIcon = document.getElementById('inferIcon');
+        const inferText = document.getElementById('inferText');
+        if (inferBtn) {
+          inferBtn.disabled = true;
+          if (inferIcon) inferIcon.textContent = '⏳';
+          if (inferText) inferText.textContent = 'Running YOLOv8 on RTX GPU...';
+        }
+        updateUI();
+
+        try {
+          const imgs = {};
+          ROADS.forEach(rd => {
+            imgs[rd] = roadData[rd].rawImage || roadData[rd].annotatedImage;
+          });
+
+          const res = await fetch('/api/analyze-4-directions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: imgs, conf: 0.25 })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            applyAnalysisResult(data);
+          }
+        } catch (e) {
+          console.warn('Inference execution note:', e);
+        } finally {
+          isInferencing = false;
+          if (inferBtn) {
+            inferBtn.disabled = false;
+            if (inferIcon) inferIcon.textContent = '⚡';
+            if (inferText) inferText.textContent = 'Run YOLOv8 on Current Photos';
+          }
+          updateUI();
+        }
+      }
+
+      // 7. Single Road Photo Upload Handler (Runs YOLO on new photo, updates real density & toggles light)
+      async function handleSingleFileUpload(road, file) {
+        if (!file) return;
+
+        // Show spinner on this road's card
+        const loader = document.getElementById('loader' + road);
+        if (loader) loader.classList.remove('hidden');
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          const base64Data = evt.target.result;
+          // Store raw image so we never re-detect on annotated boxes
+          roadData[road].rawImage = base64Data;
+          roadData[road].annotatedImage = base64Data;
+          updateUI();
+
+          try {
+            // Send single image to backend
+            const resp = await fetch('/api/analyze-single', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                road: road,
+                image: base64Data,
+                conf: 0.25
+              })
+            });
+
+            if (resp.ok) {
+              const data = await resp.json();
+              applyAnalysisResult(data);
+            } else {
+              // Fallback to 4-direction analyze
+              await executeYoloInference();
+            }
+          } catch (err) {
+            console.warn('Single file analyze error, falling back:', err);
+            await executeYoloInference();
+          } finally {
+            if (loader) loader.classList.add('hidden');
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // 8. Buttons & Event Listeners
+      const btnAutoToggle = document.getElementById('btnAutoToggle');
+      if (btnAutoToggle) {
+        btnAutoToggle.addEventListener('click', function() {
+          isDemoSimulationRunning = !isDemoSimulationRunning;
+          const textEl = document.getElementById('btnAutoText');
+          const indEl = document.getElementById('autoIndicator');
+
+          if (isDemoSimulationRunning) {
+            if (textEl) textEl.textContent = 'Mode: 🔄 Flow Simulation (Demo)';
+            if (indEl) indEl.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping';
+            btnAutoToggle.className = 'px-4 py-2 rounded-xl bg-amber-950/80 hover:bg-amber-900 border border-amber-500/60 font-extrabold text-xs text-amber-300 shadow-lg transition flex items-center gap-2 cursor-pointer';
+          } else {
+            if (textEl) textEl.textContent = 'Mode: Real AI Vision (Photo Upload Priority)';
+            if (indEl) indEl.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+            btnAutoToggle.className = 'px-4 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/60 font-extrabold text-xs text-emerald-300 shadow-lg shadow-emerald-950 transition flex items-center gap-2 cursor-pointer';
+          }
+        });
+      }
+
+      const btnLoadTestSamples = document.getElementById('btnLoadTestSamples');
+      if (btnLoadTestSamples) btnLoadTestSamples.addEventListener('click', loadInitialSamples);
+
+      const btnRunInference = document.getElementById('btnRunInference');
+      if (btnRunInference) btnRunInference.addEventListener('click', executeYoloInference);
+
+      // Multi-Photo Upload Handler (User selects multiple direction photos at once)
+      const multiInput = document.getElementById('multiFileInput');
+      if (multiInput) {
+        multiInput.addEventListener('change', async (e) => {
+          const files = Array.from(e.target.files);
+          if (!files.length) return;
+
+          // Clear input value so same files can be re-selected
+          multiInput.value = '';
+
+          // Show loader on roads being uploaded
+          ROADS.forEach((rd, idx) => {
+            if (idx < files.length) {
+              const loader = document.getElementById('loader' + rd);
+              if (loader) loader.classList.remove('hidden');
+            }
+          });
+
+          const readPromises = files.slice(0, 4).map((file, idx) => {
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (evt) => {
+                const rd = ROADS[idx];
+                roadData[rd].rawImage = evt.target.result;
+                resolve({ road: rd, dataUrl: evt.target.result });
+              };
+              reader.readAsDataURL(file);
+            });
+          });
+
+          const loaded = await Promise.all(readPromises);
+          const imgs = {};
+          loaded.forEach(item => {
+            imgs[item.road] = item.dataUrl;
+          });
+
+          try {
+            const resp = await fetch('/api/analyze-4-directions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ images: imgs, conf: 0.25 })
+            });
+
+            if (resp.ok) {
+              const data = await resp.json();
+              applyAnalysisResult(data);
+            }
+          } catch (err) {
+            console.warn('Multi-photo inference error:', err);
+          } finally {
+            ROADS.forEach(rd => {
+              const loader = document.getElementById('loader' + rd);
+              if (loader) loader.classList.add('hidden');
+            });
+          }
+        });
+      }
+
+      // Individual Road Photo Drop & Click Handlers
+      ROADS.forEach(rd => {
+        const drop = document.getElementById('drop' + rd);
+        const input = document.getElementById('input' + rd);
+
+        if (drop && input) {
+          drop.addEventListener('click', (e) => {
+            if (e.target !== input) {
+              input.click();
+            }
+          });
+
+          // Drag and drop support
+          drop.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            drop.classList.add('border-emerald-400');
+          });
+          drop.addEventListener('dragleave', () => {
+            drop.classList.remove('border-emerald-400');
+          });
+          drop.addEventListener('drop', (e) => {
+            e.preventDefault();
+            drop.classList.remove('border-emerald-400');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+              handleSingleFileUpload(rd, e.dataTransfer.files[0]);
+            }
+          });
+
+          // File change support
+          input.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+              const file = e.target.files[0];
+              // Clear input value so same file can be re-selected
+              input.value = '';
+              handleSingleFileUpload(rd, file);
+            }
+          });
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>
