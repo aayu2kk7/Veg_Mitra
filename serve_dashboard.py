@@ -62,13 +62,24 @@ class VegMitraRequestHandler(SimpleHTTPRequestHandler):
 
         if clean_path == "/healthz":
             model_ready = False
+            model_checkpoint = None
+            model_classes = []
             if TrafficModelAnalyzer is not None:
                 instance = TrafficModelAnalyzer._instance
                 model_ready = bool(instance and instance.model is not None)
+                if model_ready:
+                    model_checkpoint = os.path.basename(instance.model_path or "")
+                    model_names = instance.model.names
+                    if isinstance(model_names, dict):
+                        model_classes = [model_names[key] for key in sorted(model_names, key=lambda key: int(key))]
+                    else:
+                        model_classes = list(model_names)
             self.send_json_response({
                 "status": "ok",
                 "demo_mode": DEMO_MODE,
-                "model_ready": model_ready
+                "model_ready": model_ready,
+                "model_checkpoint": model_checkpoint,
+                "model_classes": model_classes
             })
             return
 

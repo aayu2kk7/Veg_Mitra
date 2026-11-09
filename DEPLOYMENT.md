@@ -20,11 +20,18 @@ model.
 
 When the epoch-60 `best.pt` checkpoint is available, add it to the deployment
 at the documented path
-`training/runs/traffic_finetune_from43_to60_20261101/weights/best.pt` (or use an
-explicit model path in `model_analyzer.py`). In Render, change
-`VEGMITRA_DEMO_MODE` to `false`, change the build command to
-`pip install -r requirements.txt`, and redeploy. The server will then load the
-fine-tuned checkpoint and the existing frontend will use its detection boxes,
-counts, densities, and signal decision through the same URL.
+`training/runs/traffic_finetune_from43_to60_20261101/weights/best.pt` or provide
+its deployed absolute path in Render's `VEGMITRA_MODEL` environment variable.
+The `.gitignore` excludes `.pt` files, so a checkpoint placed in the repository
+must be explicitly included (prefer Git LFS if appropriate) or fetched from
+model storage during deployment.
+
+In Render, change `VEGMITRA_DEMO_MODE` to `false`, keep
+`VEGMITRA_REQUIRE_TRAINED_MODEL` set to `true`, set `VEGMITRA_MODEL` to the
+exact epoch-60 checkpoint, change the build command to
+`pip install -r requirements.txt`, and redeploy. Strict mode verifies the
+checkpoint's four class names and refuses to fall back to generic COCO weights.
+The existing frontend will then use that model's detection boxes, counts,
+densities, and signal decision through the same URL.
 
 The demo deployment does not contain the training dataset or model weights.

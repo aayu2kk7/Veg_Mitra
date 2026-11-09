@@ -9,3 +9,5 @@ services:
     envVars:
       - key: VEGMITRA_DEMO_MODE
         value: "true"
+      - key: VEGMITRA_REQUIRE_TRAINED_MODEL
+        value: "true"

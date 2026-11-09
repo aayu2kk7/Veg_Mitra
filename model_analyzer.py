@@ -15,8 +15,14 @@ from ultralytics import YOLO
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Candidate checkpoint paths (prefer the trained epoch 60 checkpoint)
-CHECKPOINT_CANDIDATES = [
+# Candidate checkpoint paths (prefer the trained epoch 60 checkpoint). A path
+# set through VEGMITRA_MODEL takes precedence for hosted deployments.
+MODEL_PATH_OVERRIDE = os.environ.get("VEGMITRA_MODEL")
+REQUIRE_TRAINED_MODEL = os.environ.get("VEGMITRA_REQUIRE_TRAINED_MODEL", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+EXPECTED_TRAINED_CLASSES = ("car", "motorcycle", "bus", "truck")
+CHECKPOINT_CANDIDATES = ([MODEL_PATH_OVERRIDE] if MODEL_PATH_OVERRIDE else []) + [
     os.path.join(BASE_DIR, "training", "runs", "traffic_finetune_from43_to60_20261101", "weights", "best.pt"),
     os.path.join(BASE_DIR, "training", "weights", "best.pt"),
     os.path.join(BASE_DIR, "yolov8n.pt")
@@ -85,16 +91,45 @@ class TrafficModelAnalyzer:
         return cls._instance
 
     def _load_model(self):
-        for candidate in CHECKPOINT_CANDIDATES:
+        if REQUIRE_TRAINED_MODEL and not MODEL_PATH_OVERRIDE:
+            raise RuntimeError(
+                "VEGMITRA_REQUIRE_TRAINED_MODEL is enabled; set VEGMITRA_MODEL "
+                "to the exact epoch-60 checkpoint path."
+            )
+
+        candidates = [MODEL_PATH_OVERRIDE] if REQUIRE_TRAINED_MODEL else CHECKPOINT_CANDIDATES
+        for candidate in candidates:
             if os.path.exists(candidate):
                 try:
                     print(f"[ModelAnalyzer] Loading checkpoint: {candidate}")
-                    self.model = YOLO(candidate)
+                    model = YOLO(candidate)
+                    if REQUIRE_TRAINED_MODEL:
+                        names = model.names
+                        if isinstance(names, dict):
+                            names = [names[key] for key in sorted(names, key=lambda key: int(key))]
+                        normalized_names = tuple(str(name).strip().lower() for name in names)
+                        if normalized_names != EXPECTED_TRAINED_CLASSES:
+                            raise ValueError(
+                                "Checkpoint classes do not match the trained VegMitra model: "
+                                f"expected {EXPECTED_TRAINED_CLASSES}, got {normalized_names}"
+                            )
+                    self.model = model
                     self.model_path = candidate
                     print(f"[ModelAnalyzer] Model loaded successfully: {self.model.names}")
                     return
                 except Exception as e:
                     print(f"[ModelAnalyzer] Error loading {candidate}: {e}")
+                    if REQUIRE_TRAINED_MODEL:
+                        raise RuntimeError(
+                            f"The required VegMitra checkpoint could not be loaded: {candidate}"
+                        ) from e
+
+        if REQUIRE_TRAINED_MODEL:
+            expected = MODEL_PATH_OVERRIDE or CHECKPOINT_CANDIDATES[0]
+            raise FileNotFoundError(
+                "The trained VegMitra checkpoint is required but was not found. "
+                f"Set VEGMITRA_MODEL to the checkpoint file. Expected: {expected}"
+            )
 
         print("[ModelAnalyzer] Fallback to default yolov8n.pt")
         self.model = YOLO("yolov8n.pt")
