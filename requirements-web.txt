@@ -1,0 +1,2 @@
+# The demo deployment uses only the Python standard library.
+# Switch Render to requirements.txt when the trained checkpoint is added.

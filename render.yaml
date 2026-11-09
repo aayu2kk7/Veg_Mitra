@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: vegmitra-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-web.txt
+    startCommand: python serve_dashboard.py --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: VEGMITRA_DEMO_MODE
+        value: "true"

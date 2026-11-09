@@ -67,27 +67,31 @@
       <div class="flex items-center gap-2.5 flex-wrap">
         <div class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-950/80 border border-emerald-500/50 text-emerald-400">
           <span class="w-2.5 h-2.5 rounded-full bg-[#00e676] animate-pulse"></span>
-          <span>CONTINUOUS AUTO-TOGGLING</span>
+          <span id="serviceStatus">DEMO SIMULATION</span>
         </div>
         <div class="px-3 py-1 rounded-lg bg-[#111c30] border border-[#1e2a44] text-xs font-mono text-[#94a3b8]">
-          MODEL: <span class="text-[#00e676] font-bold">YOLOv8n (Epoch 60 Checkpoint)</span>
+          MODEL: <span id="modelStatus" class="text-amber-300 font-bold">Demo preview (model offline)</span>
         </div>
       </div>
     </header>
+
+    <div id="modelNotice" role="status" class="p-3 rounded-xl bg-amber-950/70 border border-amber-500/50 text-amber-200 text-sm">
+      Demo preview: the dashboard is showing sample traffic data. Image detection and bounding boxes will become available when the trained checkpoint is connected.
+    </div>
 
     <!-- Control Actions & Photo Upload Toolbar -->
     <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#0d1424] border border-[#1e2a44] shadow-lg">
       <div class="flex items-center gap-2 flex-wrap">
         <!-- Mode Switch: Real Photo AI Vision vs Flow Simulation -->
-        <button id="btnAutoToggle" class="px-4 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/60 font-extrabold text-xs text-emerald-300 shadow-lg shadow-emerald-950 transition flex items-center gap-2 cursor-pointer">
-          <span id="autoIndicator" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-          <span id="btnAutoText">Mode: Real AI Vision (Photo Upload Priority)</span>
+        <button id="btnAutoToggle" class="px-4 py-2 rounded-xl bg-amber-950/80 hover:bg-amber-900 border border-amber-500/60 font-extrabold text-xs text-amber-300 shadow-lg transition flex items-center gap-2 cursor-pointer">
+          <span id="autoIndicator" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+          <span id="btnAutoText">Mode: Flow Simulation (Demo)</span>
         </button>
 
         <!-- Analyze 4 Photos with YOLO -->
-        <button id="btnRunInference" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-blue-950">
+        <button id="btnRunInference" disabled class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-blue-950">
           <span id="inferIcon">⚡</span>
-          <span id="inferText">Run YOLOv8 on Current Photos</span>
+          <span id="inferText">Model not connected yet</span>
         </button>
 
         <!-- Multi-Photo Upload Trigger -->
@@ -443,7 +447,7 @@
 
     <!-- Footer -->
     <footer class="pt-3 border-t border-[#1c2a44] text-[11px] text-[#64748b] flex items-center justify-between flex-wrap gap-2">
-      <span>VegMitra Autonomous AI Signal Controller &bull; Powered by Fine-Tuned YOLOv8 &bull; Three.js Digital Twin</span>
+      <span>VegMitra Traffic Dashboard &bull; YOLOv8 backend activates when the trained checkpoint is connected &bull; Three.js Digital Twin</span>
       <span class="text-emerald-400 font-medium">&ldquo;Autonomous AI Signals for Greener, Flowing Cities&rdquo;</span>
     </footer>
 
@@ -479,7 +483,8 @@
       let activeWinner = 'East';
       let nextCandidateRoad = 'South';
       let phaseCountdown = 35;
-      let isDemoSimulationRunning = false; // Real Photo AI Detection is default!
+      let isDemoSimulationRunning = true; // Until the backend confirms a trained model is loaded.
+      let backendModelReady = false;
       let isAmberTransition = false;
       let visualizer3D = null;
       let isInferencing = false;
@@ -494,8 +499,56 @@
         } catch (e) {
           console.warn('3D initialization note:', e);
         }
+        refreshModelStatus();
         loadInitialSamples();
       });
+
+      async function refreshModelStatus() {
+        const statusEl = document.getElementById('modelStatus');
+        const noticeEl = document.getElementById('modelNotice');
+        const inferBtn = document.getElementById('btnRunInference');
+        const inferText = document.getElementById('inferText');
+        try {
+          const response = await fetch('/healthz', { cache: 'no-store' });
+          const status = response.ok ? await response.json() : {};
+          backendModelReady = status.model_ready === true;
+        } catch {
+          backendModelReady = false;
+        }
+
+        if (backendModelReady) {
+          isDemoSimulationRunning = false;
+          if (statusEl) {
+            statusEl.textContent = 'YOLOv8 model online';
+            statusEl.className = 'text-[#00e676] font-bold';
+          }
+          if (noticeEl) noticeEl.classList.add('hidden');
+          if (inferBtn) inferBtn.disabled = false;
+          if (inferText) inferText.textContent = 'Run YOLOv8 on Current Photos';
+          const modeText = document.getElementById('btnAutoText');
+          if (modeText) modeText.textContent = 'Mode: Real AI Vision (Photo Upload Priority)';
+          const statusBadge = document.getElementById('serviceStatus');
+          if (statusBadge) statusBadge.textContent = 'MODEL ONLINE';
+          const autoButton = document.getElementById('btnAutoToggle');
+          const autoIndicator = document.getElementById('autoIndicator');
+          if (autoButton) autoButton.disabled = false;
+          if (autoButton) autoButton.className = 'px-4 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/60 font-extrabold text-xs text-emerald-300 shadow-lg shadow-emerald-950 transition flex items-center gap-2 cursor-pointer';
+          if (autoIndicator) autoIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+        } else {
+          isDemoSimulationRunning = true;
+          if (statusEl) {
+            statusEl.textContent = 'Demo preview (model offline)';
+            statusEl.className = 'text-amber-300 font-bold';
+          }
+          if (noticeEl) noticeEl.classList.remove('hidden');
+          if (inferBtn) inferBtn.disabled = true;
+          if (inferText) inferText.textContent = 'Model not connected yet';
+          const statusBadge = document.getElementById('serviceStatus');
+          if (statusBadge) statusBadge.textContent = 'DEMO SIMULATION';
+          const autoButton = document.getElementById('btnAutoToggle');
+          if (autoButton) autoButton.disabled = true;
+        }
+      }
 
       // 2. Fetch Sample Images from Server
       async function loadInitialSamples() {
@@ -949,6 +1002,7 @@
 
       // 6. User Photo Upload & Live YOLO Inference Execution for All 4 Directions
       async function executeYoloInference() {
+        if (!backendModelReady) return;
         if (isInferencing) return;
         isInferencing = true;
 

@@ -31,11 +31,19 @@ FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 OUTPUT_JSON_PATH = os.path.join(BASE_DIR, "output", "traffic_state.json")
 TEST_IMAGES_DIR = os.path.join(BASE_DIR, "data", "test", "images")
 
-# Import the model analyzer
-try:
-    from model_analyzer import TrafficModelAnalyzer
-except ImportError:
+# Demo deployments deliberately avoid loading/downloading a model. Set
+# VEGMITRA_DEMO_MODE=false when a trained checkpoint is available.
+DEMO_MODE = os.environ.get("VEGMITRA_DEMO_MODE", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+
+if DEMO_MODE:
     TrafficModelAnalyzer = None
+else:
+    try:
+        from model_analyzer import TrafficModelAnalyzer
+    except ImportError:
+        TrafficModelAnalyzer = None
 
 
 class VegMitraRequestHandler(SimpleHTTPRequestHandler):
@@ -51,6 +59,18 @@ class VegMitraRequestHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         clean_path = self.path.split("?")[0].rstrip("/")
+
+        if clean_path == "/healthz":
+            model_ready = False
+            if TrafficModelAnalyzer is not None:
+                instance = TrafficModelAnalyzer._instance
+                model_ready = bool(instance and instance.model is not None)
+            self.send_json_response({
+                "status": "ok",
+                "demo_mode": DEMO_MODE,
+                "model_ready": model_ready
+            })
+            return
 
         if clean_path in ("/api/traffic-state", "/api/state", "/output/traffic_state.json"):
             self.serve_traffic_state()
@@ -152,7 +172,7 @@ class VegMitraRequestHandler(SimpleHTTPRequestHandler):
         conf_threshold = float(payload.get("conf", 0.25))
 
         if TrafficModelAnalyzer is None:
-            self.send_error(500, "TrafficModelAnalyzer is not initialized.")
+            self.send_model_unavailable()
             return
 
         analyzer = TrafficModelAnalyzer.get_instance()
@@ -178,7 +198,7 @@ class VegMitraRequestHandler(SimpleHTTPRequestHandler):
         images = payload.get("images", {})
 
         if TrafficModelAnalyzer is None:
-            self.send_error(500, "TrafficModelAnalyzer is not initialized.")
+            self.send_model_unavailable()
             return
 
         analyzer = TrafficModelAnalyzer.get_instance()
@@ -204,7 +224,7 @@ class VegMitraRequestHandler(SimpleHTTPRequestHandler):
 
         current_road = payload.get("current_road")
         if TrafficModelAnalyzer is None:
-            self.send_error(500, "TrafficModelAnalyzer is not initialized.")
+            self.send_model_unavailable()
             return
 
         analyzer = TrafficModelAnalyzer.get_instance()
@@ -257,6 +277,12 @@ class VegMitraRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response_bytes)
 
+    def send_model_unavailable(self):
+        self.send_json_response({
+            "error": "Image analysis is unavailable until the trained model is configured.",
+            "code": "MODEL_NOT_CONFIGURED"
+        }, status_code=503)
+
     def log_message(self, format, *args):
         # Clean log - suppress noisy traffic-state polling
         try:
@@ -276,6 +302,8 @@ def run_server(port=8080):
     if TrafficModelAnalyzer is not None:
         print("[INIT] Warming up trained YOLOv8 model...")
         TrafficModelAnalyzer.get_instance()
+    elif DEMO_MODE:
+        print("[INIT] Demo mode enabled; YOLO inference is disabled until a checkpoint is configured.")
 
     server_address = ("", port)
     
@@ -307,7 +335,7 @@ def run_server(port=8080):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="VegMitra Dashboard Web Server")
-    parser.add_argument("--port", type=int, default=8080, help="Port to serve on (default: 8080)")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8080")), help="Port to serve on")
     args = parser.parse_args()
 
     run_server(port=args.port)
